@@ -13,6 +13,10 @@ jobs:
     - name: Checkout Source Code
       uses: actions/checkout@v4
 
+    - name: Install Dependencies (ldid)
+      run: |
+        brew install ldid
+
     - name: Setup Theos
       run: |
         sudo mkdir -p /opt/theos
