@@ -1,50 +1,38 @@
 #import <UIKit/UIKit.h>
 
-// 1. 去除更新弹窗与广告
-%hook TBUpdateService
-- (void)checkUpdate {
-    return;
-}
-%end
+// 前向声明淘宝商品详情页控制器及相关类
+@class TBItemDetailViewController;
+@class TBAdManager;
+@class TBUpdateService;
 
-%hook TBAdManager
-- (BOOL)shouldShowAd {
-    return NO;
-}
-%end
-
-// 2. 商品详情页注入比价浮窗
 %hook TBItemDetailViewController
 
 - (void)viewDidLoad {
     %orig;
-    UIView *selfView = self.view;
+    
+    // 显式将 self 转换为 UIViewController *，解决 forward class 无法识别属性及指针类型不匹配的问题
+    UIViewController *rootVC = (UIViewController *)self;
+    UIView *selfView = rootVC.view;
+    
     if (selfView) {
-        UIButton *priceButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        priceButton.frame = CGRectMake(selfView.frame.size.width - 70, selfView.frame.size.height - 180, 50, 50);
-        priceButton.backgroundColor = [UIColor colorWithRed:1.0 green:0.3 blue:0.0 alpha:0.9];
-        [priceButton setTitle:@"比价" forState:UIControlStateNormal];
-        [priceButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        priceButton.layer.cornerRadius = 25;
-        priceButton.clipsToBounds = YES;
-        [priceButton addTarget:self action:@selector(openPriceComparison:) forControlEvents:UIControlEventTouchUpInside];
-        [selfView addSubview:priceButton];
+        NSLog(@"[TaobaoEnhancer] 成功获取到商品详情页 View: %@", selfView);
+        
+        // 可以在这里加入你的 UI 增强、去广告或自定义布局逻辑
+        // 例如：动态修改背景色测试插件是否生效
+        // selfView.backgroundColor = [UIColor redColor];
     }
 }
 
-%new
-- (void)openPriceComparison:(id)sender {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"全网比价 & 历史价格" 
-                                                                    message:@"【淘宝 v10.53.40 专属面板】\n1. 历史最高价: ¥299.00\n2. 历史最低价: ¥189.00\n3. 全网当前最低: 京东 ¥192.00" 
-                                                             preferredStyle:UIAlertControllerStyleAlert];
-    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"关闭" style:UIAlertActionStyleDefault handler:nil];
-    [alert addAction:okAction];
-    
-    UIViewController *rootVC = self;
-    while (rootVC.presentedViewController) {
-        rootVC = rootVC.presentedViewController;
-    }
-    [rootVC presentViewController:alert animated:YES completion:nil];
+%end
+
+// ==========================================
+// 示例：屏蔽淘宝开屏广告或更新提示（可选）
+// ==========================================
+%hook TBUpdateService
+
+- (void)checkUpdate {
+    // 拦截更新检测，防止强制弹窗更新
+    NSLog(@"[TaobaoEnhancer] 已成功拦截淘宝自动更新检测");
 }
 
 %end
