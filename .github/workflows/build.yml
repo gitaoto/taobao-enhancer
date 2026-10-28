@@ -7,8 +7,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
-
+    runs-on: macos-latest
+    
     steps:
     - name: Checkout Source Code
       uses: actions/checkout@v4
@@ -18,7 +18,7 @@ jobs:
         sudo mkdir -p /opt/theos
         sudo chown -R $USER:$GROUP /opt/theos
         git clone --recursive https://github.com/theos/theos.git /opt/theos
-
+        
     - name: Set Theos Environment
       run: |
         echo "THEOS=/opt/theos" >> $GITHUB_ENV
