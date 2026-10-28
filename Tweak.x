@@ -2,32 +2,39 @@
 
 @interface UIViewController (TaobaoEnhancer)
 - (void)tbEnhancer_showPriceHistory;
-- (void)tbEnhancer_addHistoryButton;
-- (void)tbEnhancer_removeHistoryButton;
 @end
 
 // 声明全局按钮 Tag，避免重复创建
 static const NSInteger kPriceHistoryBtnTag = 8881027;
 
-// 定义通用注入宏/逻辑
+// 现代化且安全的窗口及按钮注入逻辑
 static void InjectPriceButton(UIViewController *vc) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        // 获取当前活跃的 KeyWindow
-        UIWindow *keyWindow = nil;
-        for (UIWindow *window in [UIApplication sharedApplication].windows) {
-            if (window.isKeyWindow) {
-                keyWindow = window;
-                break;
+        UIWindow *targetWindow = nil;
+        
+        // 使用 iOS 13+ 推荐的 UIWindowScene 方式获取活跃窗口
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive) {
+                for (UIWindow *window in scene.windows) {
+                    if (window.isKeyWindow) {
+                        targetWindow = window;
+                        break;
+                    }
+                }
+                if (!targetWindow) {
+                    targetWindow = scene.windows.firstObject;
+                }
+                if (targetWindow) break;
             }
         }
-        if (!keyWindow) keyWindow = [UIApplication sharedApplication].keyWindow;
-        if (!keyWindow) return;
+        
+        if (!targetWindow) return;
         
         // 如果已经存在按钮，直接置顶并显示
-        UIButton *existBtn = (UIButton *)[keyWindow viewWithTag:kPriceHistoryBtnTag];
+        UIButton *existBtn = (UIButton *)[targetWindow viewWithTag:kPriceHistoryBtnTag];
         if (existBtn) {
             existBtn.hidden = NO;
-            [keyWindow bringSubviewToFront:existBtn];
+            [targetWindow bringSubviewToFront:existBtn];
             return;
         }
         
@@ -46,24 +53,26 @@ static void InjectPriceButton(UIViewController *vc) {
         // 绑定点击事件
         [priceHistoryBtn addTarget:vc action:@selector(tbEnhancer_showPriceHistory) forControlEvents:UIControlEventTouchUpInside];
         
-        [keyWindow addSubview:priceHistoryBtn];
-        [keyWindow bringSubviewToFront:priceHistoryBtn];
+        [targetWindow addSubview:priceHistoryBtn];
+        [targetWindow bringSubviewToFront:priceHistoryBtn];
     });
 }
 
 static void HidePriceButton() {
     dispatch_async(dispatch_get_main_queue(), ^{
-        for (UIWindow *window in [UIApplication sharedApplication].windows) {
-            UIButton *existBtn = (UIButton *)[window viewWithTag:kPriceHistoryBtnTag];
-            if (existBtn) {
-                existBtn.hidden = YES;
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            for (UIWindow *window in scene.windows) {
+                UIButton *existBtn = (UIButton *)[window viewWithTag:kPriceHistoryBtnTag];
+                if (existBtn) {
+                    existBtn.hidden = YES;
+                }
             }
         }
     });
 }
 
 // ==========================================
-// 1. 商品详情页 Hook（兼容淘宝 10.53.40 新旧控制器）
+// 1. 商品详情页 Hook（淘宝 10.53.40 兼容）
 // ==========================================
 %hook TBItemDetailViewController
 
@@ -93,7 +102,6 @@ static void HidePriceButton() {
 
 %end
 
-// 兼容 10.53.40 重构后的 AliDetail 主控制器
 %hook AliDetailViewController
 
 - (void)viewDidAppear:(BOOL)animated {
