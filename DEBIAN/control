@@ -1,1 +1,9 @@
-
+Package: com.yourname.taobaoenhancer
+Name: TaobaoEnhancer
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 15.0)
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Taobao Tweak for iOS 17 Rootless
+Maintainer: Developer
+Author: Developer
+Section: Tweaks
