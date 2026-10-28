@@ -5,22 +5,23 @@
 @end
 
 // ==========================================
-// 1. 商品详情页：“历史价格”按钮（省电/高效渲染）
+// 1. 商品详情页：“历史价格”按钮（稳健且省电）
 // ==========================================
 %hook TBItemDetailViewController
 
 - (void)viewDidLoad {
-    %orig;
+    %orig; // 必须先执行原生的 viewDidLoad，保证排队与加载逻辑正常运行
     
-    UIViewController *rootVC = (UIViewController *)self;
-    UIView *selfView = rootVC.view;
-    
-    if (selfView) {
-        // 使用 Tag 机制防止重复创建视图，降低 CPU/内存开销
+    // 异步延迟到主线程，防止阻塞淘宝页面的正常初始化渲染
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController *rootVC = (UIViewController *)self;
+        UIView *selfView = rootVC.view;
+        
+        if (!selfView) return;
+        
+        // 防重复注入标记
         NSInteger btnTag = 8881027;
-        if ([selfView viewWithTag:btnTag]) {
-            return;
-        }
+        if ([selfView viewWithTag:btnTag]) return;
         
         // 创建低功耗轻量级“历史价格”悬浮按钮
         UIButton *priceHistoryBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -38,10 +39,11 @@
         
         [selfView addSubview:priceHistoryBtn];
         [selfView bringSubviewToFront:priceHistoryBtn];
-    }
+    });
 }
 
 // 历史价格按钮点击触发逻辑
+%new
 - (void)tbEnhancer_showPriceHistory {
     UIViewController *rootVC = (UIViewController *)self;
     
@@ -59,41 +61,36 @@
 
 
 // ==========================================
-// 2. 去开屏广告（拦截加载 + 零网络开销）
+// 2. 精准去开屏广告（不影响正常启动流）
 // ==========================================
 %hook TBAdManager
 
 - (BOOL)isSplashAdEnable {
-    // 强制返回 NO，阻止广告预加载，节省蜂窝网络流量和系统电量
     return NO;
 }
 
+// 使用安全阻断，不空置基础初始化
 - (void)loadSplashAd {
-    // 空方法直接阻断开屏广告请求
-}
-
-- (void)showSplashAd {
-    // 空方法直接阻断广告渲染
+    // 拦截开屏广告请求，防止后台消耗流量和电量
 }
 
 %end
 
 
 // ==========================================
-// 3. 去更新 & 去更新提示（彻底切断后台轮询）
+// 3. 安全去更新 & 屏蔽更新提示弹窗
 // ==========================================
 %hook TBUpdateService
 
 - (void)checkUpdate {
-    // 直接阻断更新检查请求，省去后台 API 定时轮询电量
+    // 切断后台自动更新检测轮询
 }
 
 - (void)showUpdateAlert {
-    // 阻断弹窗渲染
+    // 阻断弹窗展示，避免弹窗打扰
 }
 
 - (BOOL)isForceUpdate {
-    // 强制标记非强更
     return NO;
 }
 
