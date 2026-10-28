@@ -5,7 +5,7 @@ static UIButton *g_floatingBtn = nil;
 
 // 悬浮球点击事件处理函数
 @interface TaobaoEnhancerManager : NSObject
-+ (void)sharedInstance;
++ (instancetype)sharedInstance;
 - (void)floatingBtnTapped:(id)sender;
 @end
 
