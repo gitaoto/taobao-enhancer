@@ -1,0 +1,35 @@
+name: Build Theos Tweak DEB
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-13
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    - name: Setup Theos
+      run: |
+        sudo mkdir -p /opt/theos
+        sudo chown -R $USER:$GROUP /opt/theos
+        git clone --recursive https://github.com/theos/theos.git /opt/theos
+
+    - name: Set Theos Environment
+      run: |
+        echo "THEOS=/opt/theos" >> $GITHUB_ENV
+        echo "/opt/theos/bin" >> $GITHUB_PATH
+
+    - name: Build Rootless DEB Package
+      run: |
+        make package THEOS_PACKAGE_SCHEME=rootless
+
+    - name: Upload Artifact (DEB)
+      uses: actions/upload-artifact@v4
+      with:
+        name: taobaochajian1027
+        path: packages/*.deb
