@@ -2,53 +2,116 @@
 
 @interface UIViewController (TaobaoEnhancer)
 - (void)tbEnhancer_showPriceHistory;
+- (void)tbEnhancer_addHistoryButton;
+- (void)tbEnhancer_removeHistoryButton;
 @end
 
-// ==========================================
-// 1. 商品详情页：“历史价格”按钮（稳健且省电）
-// ==========================================
-%hook TBItemDetailViewController
+// 声明全局按钮 Tag，避免重复创建
+static const NSInteger kPriceHistoryBtnTag = 8881027;
 
-- (void)viewDidLoad {
-    %orig; // 必须先执行原生的 viewDidLoad，保证排队与加载逻辑正常运行
-    
-    // 异步延迟到主线程，防止阻塞淘宝页面的正常初始化渲染
+// 定义通用注入宏/逻辑
+static void InjectPriceButton(UIViewController *vc) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *rootVC = (UIViewController *)self;
-        UIView *selfView = rootVC.view;
+        // 获取当前活跃的 KeyWindow
+        UIWindow *keyWindow = nil;
+        for (UIWindow *window in [UIApplication sharedApplication].windows) {
+            if (window.isKeyWindow) {
+                keyWindow = window;
+                break;
+            }
+        }
+        if (!keyWindow) keyWindow = [UIApplication sharedApplication].keyWindow;
+        if (!keyWindow) return;
         
-        if (!selfView) return;
+        // 如果已经存在按钮，直接置顶并显示
+        UIButton *existBtn = (UIButton *)[keyWindow viewWithTag:kPriceHistoryBtnTag];
+        if (existBtn) {
+            existBtn.hidden = NO;
+            [keyWindow bringSubviewToFront:existBtn];
+            return;
+        }
         
-        // 防重复注入标记
-        NSInteger btnTag = 8881027;
-        if ([selfView viewWithTag:btnTag]) return;
-        
-        // 创建低功耗轻量级“历史价格”悬浮按钮
+        // 创建悬浮按钮
+        CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
         UIButton *priceHistoryBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-        priceHistoryBtn.tag = btnTag;
-        priceHistoryBtn.frame = CGRectMake(selfView.bounds.size.width - 85, 130, 75, 32);
+        priceHistoryBtn.tag = kPriceHistoryBtnTag;
+        priceHistoryBtn.frame = CGRectMake(screenWidth - 85, 180, 75, 32); // 避开顶部导航栏
         [priceHistoryBtn setTitle:@"历史价格" forState:UIControlStateNormal];
         [priceHistoryBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
         priceHistoryBtn.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-        priceHistoryBtn.backgroundColor = [UIColor colorWithRed:1.00 green:0.30 blue:0.00 alpha:0.85]; // 淘宝橙红风格
+        priceHistoryBtn.backgroundColor = [UIColor colorWithRed:1.00 green:0.30 blue:0.00 alpha:0.92]; // 淘宝橙红
         priceHistoryBtn.layer.cornerRadius = 16.0;
         priceHistoryBtn.clipsToBounds = YES;
         
         // 绑定点击事件
-        [priceHistoryBtn addTarget:rootVC action:@selector(tbEnhancer_showPriceHistory) forControlEvents:UIControlEventTouchUpInside];
+        [priceHistoryBtn addTarget:vc action:@selector(tbEnhancer_showPriceHistory) forControlEvents:UIControlEventTouchUpInside];
         
-        [selfView addSubview:priceHistoryBtn];
-        [selfView bringSubviewToFront:priceHistoryBtn];
+        [keyWindow addSubview:priceHistoryBtn];
+        [keyWindow bringSubviewToFront:priceHistoryBtn];
     });
 }
 
-// 历史价格按钮点击触发逻辑
+static void HidePriceButton() {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (UIWindow *window in [UIApplication sharedApplication].windows) {
+            UIButton *existBtn = (UIButton *)[window viewWithTag:kPriceHistoryBtnTag];
+            if (existBtn) {
+                existBtn.hidden = YES;
+            }
+        }
+    });
+}
+
+// ==========================================
+// 1. 商品详情页 Hook（兼容淘宝 10.53.40 新旧控制器）
+// ==========================================
+%hook TBItemDetailViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    InjectPriceButton((UIViewController *)self);
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    %orig;
+    HidePriceButton();
+}
+
 %new
 - (void)tbEnhancer_showPriceHistory {
     UIViewController *rootVC = (UIViewController *)self;
     
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"价格走势" 
-                                                                   message:@"已成功拦截数据入口！\n（此处可对接比价 API 或加载历史价格网页）" 
+                                                                   message:@"已成功适配 10.53.40 版本！\n（此处可接入比价 API 或加载历史价格网页）" 
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil];
+    [alert addAction:okAction];
+    
+    [rootVC presentViewController:alert animated:YES completion:nil];
+}
+
+%end
+
+// 兼容 10.53.40 重构后的 AliDetail 主控制器
+%hook AliDetailViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    InjectPriceButton((UIViewController *)self);
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    %orig;
+    HidePriceButton();
+}
+
+%new
+- (void)tbEnhancer_showPriceHistory {
+    UIViewController *rootVC = (UIViewController *)self;
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"价格走势" 
+                                                                   message:@"已成功适配 10.53.40 版本！\n（此处可接入比价 API 或加载历史价格网页）" 
                                                             preferredStyle:UIAlertControllerStyleAlert];
     
     UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil];
@@ -61,7 +124,7 @@
 
 
 // ==========================================
-// 2. 精准去开屏广告（不影响正常启动流）
+// 2. 去开屏广告
 // ==========================================
 %hook TBAdManager
 
@@ -69,25 +132,21 @@
     return NO;
 }
 
-// 使用安全阻断，不空置基础初始化
 - (void)loadSplashAd {
-    // 拦截开屏广告请求，防止后台消耗流量和电量
 }
 
 %end
 
 
 // ==========================================
-// 3. 安全去更新 & 屏蔽更新提示弹窗
+// 3. 去更新 & 去更新提示
 // ==========================================
 %hook TBUpdateService
 
 - (void)checkUpdate {
-    // 切断后台自动更新检测轮询
 }
 
 - (void)showUpdateAlert {
-    // 阻断弹窗展示，避免弹窗打扰
 }
 
 - (BOOL)isForceUpdate {
